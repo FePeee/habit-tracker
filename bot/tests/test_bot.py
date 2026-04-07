@@ -326,3 +326,181 @@ class TestReportSchedule:
                     raise ValueError
             except (ValueError, IndexError):
                 pass  # Expected
+
+
+# ==================== AI COMMANDS TESTS ====================
+
+class TestAICommands:
+    """Test new AI-powered commands."""
+
+    def test_cmd_advise_exists(self):
+        """Test that /advise handler exists."""
+        from main import cmd_advise
+        import asyncio
+        assert asyncio.iscoroutinefunction(cmd_advise)
+
+    def test_cmd_rolemodel_exists(self):
+        """Test that /rolemodel handler exists."""
+        from main import cmd_rolemodel
+        import asyncio
+        assert asyncio.iscoroutinefunction(cmd_rolemodel)
+
+    def test_cmd_suggest_exists(self):
+        """Test that /suggest handler exists."""
+        from main import cmd_suggest
+        import asyncio
+        assert asyncio.iscoroutinefunction(cmd_suggest)
+
+    def test_cmd_insights_exists(self):
+        """Test that /insights handler exists."""
+        from main import cmd_insights
+        import asyncio
+        assert asyncio.iscoroutinefunction(cmd_insights)
+
+    def test_advise_checks_registration(self):
+        """Test that /advise checks user registration."""
+        import asyncio
+        from main import cmd_advise
+        from aiogram.fsm.context import FSMContext
+
+        msg = MagicMock()
+        msg.from_user.id = 99999  # Unregistered user
+        msg.text = "/advise"
+        msg.answer = AsyncMock()
+
+        state = AsyncMock()
+
+        async def run():
+            with patch("httpx.AsyncClient") as mock_client:
+                mock_resp = MagicMock()
+                mock_resp.status_code = 404
+                mock_client.return_value.__aenter__.return_value.get.return_value = mock_resp
+                await cmd_advise(msg, state)
+
+        asyncio.run(run())
+        msg.answer.assert_called_with("❌ Please register first by sending /start")
+
+    def test_rolemodel_checks_registration(self):
+        """Test that /rolemodel checks user registration."""
+        import asyncio
+        from main import cmd_rolemodel
+
+        msg = MagicMock()
+        msg.from_user.id = 99999
+        msg.text = "/rolemodel"
+        msg.answer = AsyncMock()
+
+        state = AsyncMock()
+
+        async def run():
+            with patch("httpx.AsyncClient") as mock_client:
+                mock_resp = MagicMock()
+                mock_resp.status_code = 404
+                mock_client.return_value.__aenter__.return_value.get.return_value = mock_resp
+                await cmd_rolemodel(msg, state)
+
+        asyncio.run(run())
+        msg.answer.assert_called_with("❌ Please register first by sending /start")
+
+    def test_suggest_checks_registration(self):
+        """Test that /suggest checks user registration."""
+        import asyncio
+        from main import cmd_suggest
+
+        msg = MagicMock()
+        msg.from_user.id = 99999
+        msg.text = "/suggest"
+        msg.answer = AsyncMock()
+
+        state = AsyncMock()
+
+        async def run():
+            with patch("httpx.AsyncClient") as mock_client:
+                mock_resp = MagicMock()
+                mock_resp.status_code = 404
+                mock_client.return_value.__aenter__.return_value.get.return_value = mock_resp
+                await cmd_suggest(msg, state)
+
+        asyncio.run(run())
+        msg.answer.assert_called_with("❌ Please register first by sending /start")
+
+    def test_insights_checks_registration(self):
+        """Test that /insights checks user registration."""
+        import asyncio
+        from main import cmd_insights
+
+        msg = MagicMock()
+        msg.from_user.id = 99999
+        msg.text = "/insights"
+        msg.answer = AsyncMock()
+
+        async def run():
+            with patch("httpx.AsyncClient") as mock_client:
+                mock_resp = MagicMock()
+                mock_resp.status_code = 404
+                mock_client.return_value.__aenter__.return_value.get.return_value = mock_resp
+                await cmd_insights(msg)
+
+        asyncio.run(run())
+        msg.answer.assert_called_with("❌ Please register first by sending /start")
+
+    def test_help_includes_new_commands(self):
+        """Test that /help includes all new AI commands."""
+        import asyncio
+        from main import cmd_help
+
+        msg = MagicMock()
+        msg.answer = AsyncMock()
+
+        async def run():
+            await cmd_help(msg)
+
+        asyncio.run(run())
+        call_args = msg.answer.call_args[0][0]
+        assert "/advise" in call_args
+        assert "/rolemodel" in call_args
+        assert "/suggest" in call_args
+        assert "/insights" in call_args
+
+    def test_insights_empty_message(self):
+        """Test /insights shows proper message when no insights."""
+        import asyncio
+        from main import cmd_insights
+
+        msg = MagicMock()
+        msg.from_user.id = 12345
+        msg.text = "/insights"
+        msg.answer = AsyncMock()
+
+        async def run():
+            with patch("httpx.AsyncClient") as mock_client:
+                # First call: user check (success)
+                user_resp = MagicMock()
+                user_resp.status_code = 200
+                user_resp.json.return_value = {"id": 1, "name": "Test"}
+                
+                # Second call: insights (empty)
+                insights_resp = MagicMock()
+                insights_resp.status_code = 200
+                insights_resp.json.return_value = []
+
+                mock_cm = MagicMock()
+                mock_cm.get = AsyncMock(side_effect=[user_resp, insights_resp])
+                mock_cm.__aenter__ = AsyncMock(return_value=mock_cm)
+                mock_cm.__aexit__ = AsyncMock(return_value=None)
+                mock_client.return_value = mock_cm
+
+                await cmd_insights(msg)
+
+        asyncio.run(run())
+        # Should mention how to get insights
+        last_call = msg.answer.call_args_list[-1][0][0]
+        assert "/advise" in last_call or "/report" in last_call
+
+    def test_fsm_states_exist(self):
+        """Test that all new FSM states are defined."""
+        from main import GetHabitAdvice, GetRoleModelHabits, GetSuggestions
+        assert hasattr(GetHabitAdvice, 'waiting_habit_name')
+        assert hasattr(GetHabitAdvice, 'waiting_issue')
+        assert hasattr(GetRoleModelHabits, 'waiting_role')
+        assert hasattr(GetSuggestions, 'waiting_goal')

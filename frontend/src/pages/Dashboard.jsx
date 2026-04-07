@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { api } from "../api/client";
+import ProgressTab from "./ProgressTab";
 
 function StreakBadge({ streak }) {
   if (streak === 0) return null;
@@ -17,6 +18,7 @@ export default function Dashboard({ user, onLogout }) {
   const [reminderTime, setReminderTime] = useState("");
   const [adding, setAdding] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [activeTab, setActiveTab] = useState("habits"); // "habits" or "progress"
 
   useEffect(() => { loadHabits(); }, []);
 
@@ -102,8 +104,39 @@ export default function Dashboard({ user, onLogout }) {
           ))}
         </div>
 
-        {/* Habits list */}
-        <div style={{ background: "#fff", border: "0.5px solid #e0ddd4", borderRadius: 12, overflow: "hidden", marginBottom: 16 }}>
+        {/* Tab navigation */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+          <button
+            onClick={() => setActiveTab("habits")}
+            style={{ 
+              flex: 1, padding: "10px 16px", borderRadius: 10, border: "none",
+              background: activeTab === "habits" ? "#1D9E75" : "#fff",
+              color: activeTab === "habits" ? "#fff" : "#888",
+              fontSize: 13, cursor: "pointer", fontWeight: 500,
+              boxShadow: activeTab === "habits" ? "0 2px 8px rgba(29,158,117,0.3)" : "none"
+            }}
+          >
+            📋 Habits
+          </button>
+          <button
+            onClick={() => setActiveTab("progress")}
+            style={{ 
+              flex: 1, padding: "10px 16px", borderRadius: 10, border: "none",
+              background: activeTab === "progress" ? "#6366F1" : "#fff",
+              color: activeTab === "progress" ? "#fff" : "#888",
+              fontSize: 13, cursor: "pointer", fontWeight: 500,
+              boxShadow: activeTab === "progress" ? "0 2px 8px rgba(99,102,241,0.3)" : "none"
+            }}
+          >
+            📈 AI Progress
+          </button>
+        </div>
+
+        {/* Tab content */}
+        {activeTab === "habits" ? (
+          <div>
+            {/* Habits list */}
+            <div style={{ background: "#fff", border: "0.5px solid #e0ddd4", borderRadius: 12, overflow: "hidden", marginBottom: 16 }}>
           <div style={{ padding: "14px 18px", borderBottom: "0.5px solid #e0ddd4", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <span style={{ fontWeight: 500, fontSize: 14 }}>Today's habits</span>
             <button
@@ -176,6 +209,10 @@ export default function Dashboard({ user, onLogout }) {
             ))
           )}
         </div>
+          </div>
+        ) : (
+          <ProgressTab />
+        )}
       </div>
     </div>
   );

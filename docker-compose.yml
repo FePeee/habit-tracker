@@ -21,6 +21,7 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql://habit_user:habit_pass@db:5432/habitdb
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
     volumes:
       - ./backend:/app
     depends_on:
@@ -55,7 +56,7 @@ services:
     image: dpage/pgadmin4:latest
     container_name: habit-pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@habit.local
+      PGADMIN_DEFAULT_EMAIL: admin@habit.test
       PGADMIN_DEFAULT_PASSWORD: admin
       PGADMIN_CONFIG_SERVER_MODE: "False"
     volumes:

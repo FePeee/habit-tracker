@@ -45,6 +45,16 @@ class ScheduleReport(StatesGroup):
     waiting_day = State()
     waiting_time = State()
 
+class GetHabitAdvice(StatesGroup):
+    waiting_habit_name = State()
+    waiting_issue = State()
+
+class GetRoleModelHabits(StatesGroup):
+    waiting_role = State()
+
+class GetSuggestions(StatesGroup):
+    waiting_goal = State()
+
 
 async def ask_ai(prompt: str) -> str:
     try:
@@ -130,6 +140,10 @@ async def cmd_help(message: Message):
         "/schedule — set up automatic weekly report\n"
         "/delete — delete a habit\n"
         "/timezone — change your timezone\n"
+        "/advise — get AI advice for a habit issue\n"
+        "/rolemodel — find habits for a profession/role\n"
+        "/suggest — get AI habit suggestions\n"
+        "/insights — view your saved AI insights\n"
         "/help — show this message",
         parse_mode="Markdown"
     )
@@ -591,6 +605,241 @@ Be direct, friendly, and specific. Use emojis."""
         )
     except Exception as e:
         logging.error(f"Weekly report error for {telegram_id}: {e}")
+
+
+# ---------- New AI commands ----------
+
+@router.message(Command("advise"))
+async def cmd_advise(message: Message, state: FSMContext):
+    """Get AI advice for a specific habit issue"""
+    telegram_id = str(message.from_user.id)
+    async with httpx.AsyncClient() as client:
+        r = await client.get(f"{API_URL}/api/user-by-telegram/{telegram_id}")
+    if r.status_code != 200:
+        await message.answer("❌ Please register first by sending /start")
+        return
+
+    await state.set_state(GetHabitAdvice.waiting_habit_name)
+    await message.answer(
+        "🤖 *Habit Advisor*\n\n"
+        "What habit do you need advice about?\n\n"
+        "Example: Reading, Exercise, Meditation",
+        parse_mode="Markdown"
+    )
+
+
+@router.message(GetHabitAdvice.waiting_habit_name)
+async def process_advice_habit_name(message: Message, state: FSMContext):
+    await state.update_data(habit_name=message.text.strip())
+    await state.set_state(GetHabitAdvice.waiting_issue)
+    await message.answer(
+        "What's the issue with this habit?\n\n"
+        "Examples:\n"
+        "• Not enough time\n"
+        "• Became too easy\n"
+        "• Lost motivation\n"
+        "• Too difficult\n"
+        "• Keep forgetting"
+    )
+
+
+@router.message(GetHabitAdvice.waiting_issue)
+async def process_advice_issue(message: Message, state: FSMContext):
+    data = await state.get_data()
+    habit_name = data["habit_name"]
+    issue = message.text.strip()
+    telegram_id = str(message.from_user.id)
+
+    await message.answer("🤖 Analyzing your habit and generating advice... Please wait a moment.")
+
+    timeout = httpx.Timeout(120.0, connect=10.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        r = await client.post(f"{API_URL}/api/bot/ai-habit-advice", json={
+            "telegram_id": telegram_id,
+            "habit_name": habit_name,
+            "issue": issue
+        })
+
+    await state.clear()
+    if r.status_code == 200:
+        insight = r.json()
+        habit_name_display = insight.get('habit_name', habit_name)
+        await message.answer(
+            f"💡 *Advice for: {habit_name_display}*\n\n"
+            f"{insight['content']}\n\n"
+            f"_This insight has been saved to your profile. Use /insights to view it later._",
+            parse_mode="Markdown"
+        )
+    else:
+        await message.answer(f"❌ Error getting advice: {r.text}")
+
+
+@router.message(Command("rolemodel"))
+async def cmd_rolemodel(message: Message, state: FSMContext):
+    """Get habit suggestions based on a role model or profession"""
+    telegram_id = str(message.from_user.id)
+    async with httpx.AsyncClient() as client:
+        r = await client.get(f"{API_URL}/api/user-by-telegram/{telegram_id}")
+    if r.status_code != 200:
+        await message.answer("❌ Please register first by sending /start")
+        return
+
+    await state.set_state(GetRoleModelHabits.waiting_role)
+    await message.answer(
+        "🎭 *Role Model Habits*\n\n"
+        "Tell me a profession or describe a type of person whose habits you want to adopt.\n\n"
+        "Examples:\n"
+        "• Software Engineer\n"
+        "• Professional Athlete\n"
+        "• Successful Entrepreneur\n"
+        "• Creative Writer\n"
+        "• Research Scientist",
+        parse_mode="Markdown"
+    )
+
+
+@router.message(GetRoleModelHabits.waiting_role)
+async def process_rolemodel_role(message: Message, state: FSMContext):
+    role = message.text.strip()
+    telegram_id = str(message.from_user.id)
+
+    await message.answer("🤖 Generating profession-based habit recommendations... Please wait.")
+
+    # Get existing habits
+    timeout = httpx.Timeout(120.0, connect=10.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        habits_resp = await client.get(f"{API_URL}/api/habits-by-telegram/{telegram_id}")
+        existing_habits = [h["name"] for h in habits_resp.json()] if habits_resp.status_code == 200 else []
+
+        r = await client.post(f"{API_URL}/api/bot/ai-role-model-habits", json={
+            "telegram_id": telegram_id,
+            "role_or_profession": role,
+            "existing_habits": existing_habits
+        })
+
+    await state.clear()
+    if r.status_code == 200:
+        insight = r.json()
+        await message.answer(
+            f"🎯 *Habits for: {insight.get('context', role)}*\n\n"
+            f"{insight['content']}\n\n"
+            f"_This insight has been saved. Use /insights to view later._",
+            parse_mode="Markdown"
+        )
+    else:
+        await message.answer(f"❌ Error: {r.text}")
+
+
+@router.message(Command("suggest"))
+async def cmd_suggest(message: Message, state: FSMContext):
+    """Get general AI habit suggestions"""
+    telegram_id = str(message.from_user.id)
+    async with httpx.AsyncClient() as client:
+        r = await client.get(f"{API_URL}/api/user-by-telegram/{telegram_id}")
+    if r.status_code != 200:
+        await message.answer("❌ Please register first by sending /start")
+        return
+
+    await state.set_state(GetSuggestions.waiting_goal)
+    await message.answer(
+        "🌟 *Habit Suggestions*\n\n"
+        "What's your goal? I'll suggest habits that fit.\n\n"
+        "Examples:\n"
+        "• Become more productive\n"
+        "• Get in better shape\n"
+        "• Reduce stress\n"
+        "• Learn faster\n\n"
+        "Or send /any for general suggestions.",
+        parse_mode="Markdown"
+    )
+
+
+@router.message(GetSuggestions.waiting_goal)
+async def process_suggest_goal(message: Message, state: FSMContext):
+    goal = message.text.strip()
+    telegram_id = str(message.from_user.id)
+
+    if goal.lower() == "/any":
+        goal = None
+
+    await message.answer("🤖 Generating personalized habit suggestions... Please wait.")
+
+    timeout = httpx.Timeout(120.0, connect=10.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        payload = {"telegram_id": telegram_id, "goal": goal} if goal else {"telegram_id": telegram_id}
+        r = await client.post(f"{API_URL}/api/bot/ai-suggest-habits", json=payload)
+
+    await state.clear()
+    if r.status_code == 200:
+        insight = r.json()
+        await message.answer(
+            f"✨ *Suggestions for: {insight.get('context', 'general improvement')}*\n\n"
+            f"{insight['content']}\n\n"
+            f"_Saved to your profile. Use /insights to review._",
+            parse_mode="Markdown"
+        )
+    else:
+        await message.answer(f"❌ Error: {r.text}")
+
+
+@router.message(Command("insights"))
+async def cmd_insights(message: Message):
+    """View saved AI insights"""
+    telegram_id = str(message.from_user.id)
+    async with httpx.AsyncClient() as client:
+        r = await client.get(f"{API_URL}/api/user-by-telegram/{telegram_id}")
+    if r.status_code != 200:
+        await message.answer("❌ Please register first by sending /start")
+        return
+
+    await message.answer("📚 Loading your insights...")
+
+    timeout = httpx.Timeout(30.0, connect=10.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        r = await client.get(f"{API_URL}/api/bot/ai-insights/{telegram_id}")
+
+    if r.status_code != 200:
+        await message.answer("❌ Error loading insights.")
+        return
+
+    insights = r.json()
+    if not insights:
+        await message.answer(
+            "📭 No insights yet.\n\n"
+            "Use these commands to get AI-powered insights:\n"
+            "• /advise — advice on a specific habit\n"
+            "• /rolemodel — habits for a profession\n"
+            "• /suggest — general habit suggestions\n"
+            "• /report — weekly accountability report"
+        )
+        return
+
+    type_emoji = {
+        "habit_advice": "💡",
+        "role_model": "🎭",
+        "suggest_habits": "✨",
+        "weekly_report": "📊",
+    }
+
+    # Show last 5 insights
+    for insight in insights[:5]:
+        emoji = type_emoji.get(insight["insight_type"], "🤖")
+        context = insight.get("context", "")
+        habit_name = insight.get("habit_name", "")
+        
+        header = f"{emoji} *{insight['insight_type'].replace('_', ' ').title()}*"
+        if habit_name:
+            header += f" — {habit_name}"
+        if context:
+            header += f"\n📌 {context}"
+        
+        await message.answer(
+            f"{header}\n\n{insight['content']}",
+            parse_mode="Markdown"
+        )
+
+    if len(insights) > 5:
+        await message.answer(f"📋 Showing 5 of {len(insights)} insights. Older ones available in the web dashboard.")
 
 
 async def main():

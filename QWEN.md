@@ -243,6 +243,13 @@ cd bot && BOT_TOKEN=xxx OPENROUTER_API_KEY=yyy API_URL=http://localhost:8000 pyt
 9. **No health check endpoint** — `/docs` works but no dedicated `/health`
 10. **Frontend has no error boundary** — unhandled errors crash the entire app
 
+### Resolved Issues
+
+1. **AI report returning "None"** (April 2026) — Fixed with:
+   - `ask_ai()` now checks for `None`/empty content and returns motivational fallback
+   - `cmd_report` and `send_report_to_user` detect 0% week completion and skip AI entirely
+   - Fresh start message sent directly: "🌱 Week zero — and that's okay!"
+
 ---
 
 ## File Map

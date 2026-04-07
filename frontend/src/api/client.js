@@ -52,4 +52,28 @@ export const api = {
 
   deleteHabit: (id) =>
     request(`/api/habits/${id}`, { method: "DELETE" }),
+
+  // AI Insights
+  getAIInsights: () => request("/api/ai-insights"),
+
+  getHabitAdvice: (habit_name, issue) =>
+    request("/api/ai-habit-advice", {
+      method: "POST",
+      body: JSON.stringify({ habit_name, issue }),
+    }),
+
+  getRoleModelHabits: (role_or_profession, existing_habits = []) =>
+    request("/api/ai-role-model-habits", {
+      method: "POST",
+      body: JSON.stringify({ role_or_profession, existing_habits }),
+    }),
+
+  getSuggestHabits: (goal = null) =>
+    request("/api/ai-suggest-habits", {
+      method: "POST",
+      body: JSON.stringify({ goal }),
+    }),
+
+  deleteAIInsight: (id) =>
+    request(`/api/ai-insights/${id}`, { method: "DELETE" }),
 };

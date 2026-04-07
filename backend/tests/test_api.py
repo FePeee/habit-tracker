@@ -1,8 +1,9 @@
 """
 Comprehensive tests for the Habit Tracker backend API.
-Covers: auth, habits CRUD, completions, stats, telegram integration, scheduling.
+Covers: auth, habits CRUD, completions, stats, telegram integration, scheduling, AI insights.
 """
 import pytest
+from unittest.mock import patch, MagicMock
 from fastapi import status
 from sqlalchemy.orm import Session
 import models
@@ -480,3 +481,185 @@ class TestStreaks:
         habit_id = resp.json()["id"]
         complete_resp = client.post(f"/api/complete-by-telegram/streak_user2/{habit_id}")
         assert complete_resp.json()["streak"] == 1
+
+
+# ==================== AI INSIGHTS TESTS ====================
+
+class TestAIInsights:
+    def test_get_habit_advice_success(self, client):
+        """Test getting AI advice for a habit."""
+        client.post("/api/auth/register", json={
+            "email": "advice@test.com",
+            "password": "pass123",
+            "name": "Advice Seeker"
+        })
+        login_resp = client.post("/api/auth/login", data={
+            "username": "advice@test.com",
+            "password": "pass123"
+        })
+        token = login_resp.json()["access_token"]
+
+        # Create a habit first
+        habit_resp = client.post("/api/habits", json={"name": "Reading"}, headers={"Authorization": f"Bearer {token}"})
+        assert habit_resp.status_code == status.HTTP_200_OK
+
+        # Mock AI call
+        with patch("main._call_ai", return_value="📚 Try reading 10 minutes before bed. Great habit!"):
+            response = client.post("/api/ai-habit-advice", json={
+                "habit_name": "Reading",
+                "issue": "not enough time"
+            }, headers={"Authorization": f"Bearer {token}"})
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["insight_type"] == "habit_advice"
+        assert "content" in data
+        assert data["habit_name"] == "Reading"
+
+    def test_get_habit_advice_unauthenticated(self, client):
+        """Test that unauthenticated users can't get advice."""
+        response = client.post("/api/ai-habit-advice", json={
+            "habit_name": "Reading",
+            "issue": "not enough time"
+        })
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_get_role_model_habits_success(self, client):
+        """Test getting role model habit suggestions."""
+        client.post("/api/auth/register", json={
+            "email": "rolemodel@test.com",
+            "password": "pass123",
+            "name": "Career Changer"
+        })
+        login_resp = client.post("/api/auth/login", data={
+            "username": "rolemodel@test.com",
+            "password": "pass123"
+        })
+        token = login_resp.json()["access_token"]
+
+        with patch("main._call_ai", return_value="💼 Software engineers should code daily, read docs, and build projects."):
+            response = client.post("/api/ai-role-model-habits", json={
+                "role_or_profession": "Software Engineer",
+                "existing_habits": ["Reading", "Exercise"]
+            }, headers={"Authorization": f"Bearer {token}"})
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["insight_type"] == "role_model"
+        assert data["context"] == "Role: Software Engineer"
+
+    def test_suggest_habits_success(self, client):
+        """Test getting general habit suggestions."""
+        client.post("/api/auth/register", json={
+            "email": "suggest@test.com",
+            "password": "pass123",
+            "name": "Goal Setter"
+        })
+        login_resp = client.post("/api/auth/login", data={
+            "username": "suggest@test.com",
+            "password": "pass123"
+        })
+        token = login_resp.json()["access_token"]
+
+        with patch("main._call_ai", return_value="🎯 Try meditation, journaling, and exercise for productivity."):
+            response = client.post("/api/ai-suggest-habits", json={
+                "goal": "become more productive"
+            }, headers={"Authorization": f"Bearer {token}"})
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["insight_type"] == "suggest_habits"
+        assert data["context"] == "become more productive"
+
+    def test_get_ai_insights_list(self, client):
+        """Test retrieving all AI insights."""
+        client.post("/api/auth/register", json={
+            "email": "insights@test.com",
+            "password": "pass123",
+            "name": "Insight Viewer"
+        })
+        login_resp = client.post("/api/auth/login", data={
+            "username": "insights@test.com",
+            "password": "pass123"
+        })
+        token = login_resp.json()["access_token"]
+
+        # Create an insight first
+        with patch("main._call_ai", return_value="Test insight content"):
+            client.post("/api/ai-suggest-habits", json={
+                "goal": "test goal"
+            }, headers={"Authorization": f"Bearer {token}"})
+
+        # Get insights
+        response = client.get("/api/ai-insights", headers={"Authorization": f"Bearer {token}"})
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) >= 1
+        assert data[0]["content"] == "Test insight content"
+
+    def test_delete_ai_insight(self, client):
+        """Test deleting an AI insight."""
+        client.post("/api/auth/register", json={
+            "email": "delete_insight@test.com",
+            "password": "pass123",
+            "name": "Deleter"
+        })
+        login_resp = client.post("/api/auth/login", data={
+            "username": "delete_insight@test.com",
+            "password": "pass123"
+        })
+        token = login_resp.json()["access_token"]
+
+        # Create insight
+        with patch("main._call_ai", return_value="To be deleted"):
+            create_resp = client.post("/api/ai-suggest-habits", json={
+                "goal": "delete test"
+            }, headers={"Authorization": f"Bearer {token}"})
+        insight_id = create_resp.json()["id"]
+
+        # Delete it
+        delete_resp = client.delete(f"/api/ai-insights/{insight_id}", headers={"Authorization": f"Bearer {token}"})
+        assert delete_resp.status_code == status.HTTP_200_OK
+
+        # Verify deletion
+        get_resp = client.get("/api/ai-insights", headers={"Authorization": f"Bearer {token}"})
+        insights = get_resp.json()
+        assert not any(i["id"] == insight_id for i in insights)
+
+    def test_cannot_delete_other_user_insight(self, client):
+        """Test that users can't delete other users' insights."""
+        # User 1
+        client.post("/api/auth/register", json={
+            "email": "user1@test.com",
+            "password": "pass123",
+            "name": "User One"
+        })
+        login1 = client.post("/api/auth/login", data={
+            "username": "user1@test.com",
+            "password": "pass123"
+        })
+        token1 = login1.json()["access_token"]
+
+        # User 2
+        client.post("/api/auth/register", json={
+            "email": "user2@test.com",
+            "password": "pass123",
+            "name": "User Two"
+        })
+        login2 = client.post("/api/auth/login", data={
+            "username": "user2@test.com",
+            "password": "pass123"
+        })
+        token2 = login2.json()["access_token"]
+
+        # User 1 creates insight
+        with patch("main._call_ai", return_value="User 1 insight"):
+            create_resp = client.post("/api/ai-suggest-habits", json={
+                "goal": "test"
+            }, headers={"Authorization": f"Bearer {token1}"})
+        insight_id = create_resp.json()["id"]
+
+        # User 2 tries to delete User 1's insight
+        delete_resp = client.delete(f"/api/ai-insights/{insight_id}", headers={"Authorization": f"Bearer {token2}"})
+        assert delete_resp.status_code == status.HTTP_404_NOT_FOUND

@@ -43,3 +43,18 @@ class Completion(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     habit = relationship("Habit", back_populates="completions")
+
+
+class AIInsight(Base):
+    __tablename__ = "ai_insights"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    insight_type = Column(String, nullable=False)  # "habit_advice", "role_model", "suggest_habits", "weekly_report"
+    content = Column(String, nullable=False)  # AI-generated text
+    habit_id = Column(Integer, ForeignKey("habits.id"), nullable=True)  # Optional: linked habit
+    context = Column(String, nullable=True)  # User-provided context (e.g., profession name)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    owner = relationship("User")
+    habit = relationship("Habit")
