@@ -40,11 +40,10 @@ OPENROUTER_API_KEY=your_openrouter_api_key
 docker-compose up --build
 ```
 
-This starts 5 services:
+This starts 4 services:
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8000
 - **API Docs (Swagger)**: http://localhost:8000/docs
-- **pgAdmin**: http://localhost:5050 (login: `admin@habit.local` / `admin`)
 - **PostgreSQL**: Port 5432
 
 ### 3. How to use
@@ -99,14 +98,7 @@ You can still get instant reports anytime with `/report`.
 | **Frontend** | http://localhost:3000 | React + Vite web app |
 | **Backend API** | http://localhost:8000 | FastAPI REST API |
 | **API Docs** | http://localhost:8000/docs | Swagger UI (interactive) |
-| **pgAdmin** | http://localhost:5050 | PostgreSQL database manager |
 | **PostgreSQL** | localhost:5432 | Database server |
-
-### pgAdmin Access
-
-- **Email**: `admin@habit.local`
-- **Password**: `admin`
-- The database server is pre-configured in `pgadmin/servers.json`
 
 ---
 
@@ -153,9 +145,6 @@ habit-tracker/
 │   ├── vitest.config.js        # Test configuration
 │   └── Dockerfile
 │
-├── pgadmin/
-│   └── servers.json            # pgAdmin auto-configuration
-│
 ├── .github/
 │   └── workflows/
 │       └── ci.yml              # GitHub Actions CI/CD
@@ -177,7 +166,7 @@ habit-tracker/
 | **Database** | PostgreSQL 16 (Docker) / SQLite (local dev fallback) |
 | **Testing** | pytest (backend/bot), Vitest + Testing Library (frontend) |
 | **CI/CD** | GitHub Actions (automated testing on push/PR) |
-| **DevOps** | Docker Compose, pgAdmin |
+| **DevOps** | Docker Compose |
 
 ---
 
@@ -344,6 +333,7 @@ For PostgreSQL in Docker, the schema is auto-created on startup via `Base.metada
 - `POST /api/link-telegram` — Link Telegram to web account
 - `GET /api/habits-by-telegram/{telegram_id}` — List habits
 - `POST /api/habits-by-telegram-create/{telegram_id}` — Create habit
+- `DELETE /api/habits-by-telegram-delete/{telegram_id}/{habit_id}` — Delete habit
 - `POST /api/complete-by-telegram/{telegram_id}/{habit_id}` — Complete habit
 
 ### Stats & Reports

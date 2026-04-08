@@ -19,9 +19,10 @@ services:
     build: ./backend
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
       - DATABASE_URL=postgresql://habit_user:habit_pass@db:5432/habitdb
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
     volumes:
       - ./backend:/app
     depends_on:
@@ -31,10 +32,10 @@ services:
 
   bot:
     build: ./bot
+    env_file:
+      - .env
     environment:
-      - BOT_TOKEN=${BOT_TOKEN}
       - API_URL=http://backend:8000
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
     depends_on:
       - backend
     volumes:
@@ -52,22 +53,5 @@ services:
       - /app/node_modules
     command: npm run dev -- --host
 
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: habit-pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@habit.test
-      PGADMIN_DEFAULT_PASSWORD: admin
-      PGADMIN_CONFIG_SERVER_MODE: "False"
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-      - ./pgadmin/servers.json:/pgadmin4/servers.json
-    ports:
-      - "5050:80"
-    depends_on:
-      - db
-    restart: unless-stopped
-
 volumes:
   postgres_data:
-  pgadmin_data:

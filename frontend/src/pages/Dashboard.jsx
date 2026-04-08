@@ -35,9 +35,9 @@ export default function Dashboard({ user, onLogout }) {
 
   async function handleComplete(id) {
     try {
-      await api.completeHabit(id);
+      const result = await api.completeHabit(id);
       setHabits(prev => prev.map(h =>
-        h.id === id ? { ...h, done_today: true, streak: h.streak + 1 } : h
+        h.id === id ? { ...h, done_today: true, streak: result.streak ?? h.streak + 1 } : h
       ));
     } catch (e) { console.error(e); }
   }

@@ -1,7 +1,6 @@
-FROM node:25-bookworm-slim
+FROM node:20-bookworm-slim
 WORKDIR /app
-RUN npm install -g pnpm
 COPY package.json .
-RUN pnpm install
+RUN npm install
 COPY . .
-CMD ["pnpm", "run", "dev", "--", "--host"]
+CMD ["npm", "run", "dev", "--", "--host"]

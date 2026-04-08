@@ -29,6 +29,7 @@ htmlcov/
 # IDE
 .vscode/
 .idea/
+.qwen/
 *.swp
 *.swo
 
@@ -38,4 +39,3 @@ Thumbs.db
 
 # Docker
 postgres_data/
-pgadmin_data/
